@@ -22,9 +22,21 @@ class AudioSyncer {
         this._playTone(300, 100, 'sine', 0.1, 0.5);
     }
 
-    playPop() {
+    playPop(colorObj, pitchScale = 1) {
         if (!this.enabled) return;
-        this._playTone(800, 400, 'triangle', 0.05, 0.4);
+        const freqs = {
+            '#ef4444': 400, // Red
+            '#22c55e': 450, // Green
+            '#3b82f6': 500, // Blue
+            '#eab308': 650, // Yellow
+            '#a855f7': 600, // Purple
+            '#f97316': 550, // Orange
+            'bomb': 200
+        };
+        let bFreq = freqs[colorObj] || 500;
+
+        // Soft sa catchy: sine wave
+        this._playTone(bFreq * pitchScale, (bFreq * pitchScale) * 0.8, 'sine', 0.15, 0.4);
     }
 
     playBounce() {
@@ -125,13 +137,28 @@ class Bubble {
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
 
-        const grad = ctx.createRadialGradient(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.1, 0, 0, this.radius);
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.3, this.color);
-        grad.addColorStop(1, this._shadeColor(this.color, -30));
+        if (this.color === 'bomb') {
+            const grad = ctx.createRadialGradient(-this.radius * 0.2, -this.radius * 0.2, this.radius * 0.1, 0, 0, this.radius);
+            grad.addColorStop(0, '#555555');
+            grad.addColorStop(1, '#000000');
+            ctx.fillStyle = grad;
+            ctx.fill();
 
-        ctx.fillStyle = grad;
-        ctx.fill();
+            ctx.fillStyle = '#ef4444';
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            const grad = ctx.createRadialGradient(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.1, 0, 0, this.radius);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.3, this.color);
+            grad.addColorStop(1, this._shadeColor(this.color, -30));
+
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
         ctx.restore();
     }
 
@@ -199,6 +226,36 @@ class Particle {
     }
 }
 
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+    }
+    update(dt) {
+        this.y -= 30 * (dt / 1000); // float up
+        this.life -= 1.2 * (dt / 1000); // fade out over roughly a second
+    }
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.font = 'bold 26px Outfit';
+        ctx.fillStyle = this.color;
+
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
 class GameEngine {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -215,6 +272,7 @@ class GameEngine {
 
         document.getElementById('start-btn').addEventListener('click', () => this.startGame());
         document.getElementById('restart-btn').addEventListener('click', () => this.proceedToNextOrRestart());
+        document.getElementById('in-game-restart-btn').addEventListener('click', () => this.startGame());
 
         this.audio = new AudioSyncer();
 
@@ -226,6 +284,7 @@ class GameEngine {
         this.bubbles = [];
         this.particles = [];
         this.floatingBubbles = [];
+        this.floatingTexts = [];
 
         this.playerCannon = { x: 0, y: 0, angle: -Math.PI / 2 };
         this.activeBubble = null;
@@ -235,8 +294,12 @@ class GameEngine {
         this.bubbleRadius = 0;
         this.rowHeight = 0;
         this.maxRows = 0;
+        this.topMargin = 0;
+        this.baseTopMargin = 0;
+        this.currentCeilingOffset = 0;
 
         this.mousePos = { x: 0, y: 0 };
+        this.isDragging = false;
 
         this.resize = this.resize.bind(this);
         this.loop = this.loop.bind(this);
@@ -245,13 +308,9 @@ class GameEngine {
         this.handlePointerUp = this.handlePointerUp.bind(this); // new up handler
 
         window.addEventListener('resize', this.resize);
-        this.canvas.addEventListener('mousemove', this.handlePointerMove);
-        this.canvas.addEventListener('mousedown', this.handlePointerDown);
-        this.canvas.addEventListener('mouseup', this.handlePointerUp); // bind up to shoot
-
-        this.canvas.addEventListener('touchmove', this.handlePointerMove, { passive: false });
-        this.canvas.addEventListener('touchstart', this.handlePointerDown, { passive: false });
-        this.canvas.addEventListener('touchend', this.handlePointerUp, { passive: false }); // bind up to shoot
+        this.canvas.addEventListener('pointermove', this.handlePointerMove);
+        this.canvas.addEventListener('pointerdown', this.handlePointerDown);
+        this.canvas.addEventListener('pointerup', this.handlePointerUp);
 
         this.lastTime = 0;
         this.resize();
@@ -265,7 +324,13 @@ class GameEngine {
 
         this.bubbleRadius = this.canvas.width / (this.cols * 2);
         this.rowHeight = this.bubbleRadius * Math.sqrt(3);
-        this.maxRows = Math.floor(this.canvas.height / this.rowHeight) - 2;
+
+        const topUI = document.getElementById('top-ui');
+        this.baseTopMargin = topUI ? topUI.offsetHeight + 40 : 100; // Add breathing room below UI
+        this.topMargin = this.baseTopMargin + this.currentCeilingOffset;
+
+        // Ensure we calculate rows factoring in the margin so bubbles don't go off bottom
+        this.maxRows = Math.floor((this.canvas.height - this.baseTopMargin) / this.rowHeight) - 2;
 
         this.playerCannon.x = this.canvas.width / 2;
         this.playerCannon.y = this.canvas.height - this.bubbleRadius * 2;
@@ -298,12 +363,12 @@ class GameEngine {
         const isOffset = row % 2 !== 0;
         const xOffset = isOffset ? this.bubbleRadius : 0;
         const x = xOffset + this.bubbleRadius + (col * this.bubbleRadius * 2);
-        const y = this.bubbleRadius + (row * this.rowHeight);
+        const y = this.topMargin + this.bubbleRadius + (row * this.rowHeight);
         return { x, y };
     }
 
     getGridPositionFromPixels(x, y) {
-        let row = Math.round((y - this.bubbleRadius) / this.rowHeight);
+        let row = Math.round((y - this.topMargin - this.bubbleRadius) / this.rowHeight);
         row = Math.max(0, Math.min(row, this.maxRows - 1));
 
         const isOffset = row % 2 !== 0;
@@ -342,11 +407,15 @@ class GameEngine {
     }
 
     loadLevel(levelIndex) {
+        this.currentCeilingOffset = 0;
+        this.topMargin = this.baseTopMargin;
+
         this.state = GAME_STATE.PLAYING;
         this.grid = [];
         this.bubbles = [];
         this.particles = [];
         this.floatingBubbles = [];
+        this.floatingTexts = [];
 
         const levelDef = LEVELS[levelIndex % LEVELS.length];
         this.levelEl.innerText = levelIndex + 1;
@@ -377,14 +446,27 @@ class GameEngine {
 
     pickNextBubble() {
         const availableColors = new Set(this.bubbles.filter(b => b.active && !b.popping && !b.falling).map(b => b.color));
-        const colorArr = Array.from(availableColors);
+        let colorArr = Array.from(availableColors);
 
         if (colorArr.length === 0) {
-            this.nextBubbleColor = COLOR_VALUES[0];
-        } else {
-            this.nextBubbleColor = colorArr[Math.floor(Math.random() * colorArr.length)];
+            colorArr = COLOR_VALUES;
         }
-        this.nextBallPreviewEl.style.backgroundColor = this.nextBubbleColor;
+
+        // 5% chance of a bomb bubble
+        if (Math.random() < 0.05) {
+            this.nextBubbleColor = 'bomb';
+            this.nextBallPreviewEl.style.backgroundColor = '#222';
+            this.nextBallPreviewEl.style.boxShadow = '0 0 10px #ef4444';
+        } else {
+            // normal color
+            // filter out 'bomb' if it somehow got in availableColors
+            colorArr = colorArr.filter(c => c !== 'bomb');
+            if (colorArr.length === 0) colorArr = COLOR_VALUES;
+
+            this.nextBubbleColor = colorArr[Math.floor(Math.random() * colorArr.length)];
+            this.nextBallPreviewEl.style.backgroundColor = this.nextBubbleColor;
+            this.nextBallPreviewEl.style.boxShadow = '';
+        }
     }
 
     loadActiveBubble() {
@@ -396,14 +478,9 @@ class GameEngine {
     handlePointerMove(e) {
         if (this.state !== GAME_STATE.PLAYING) return;
 
-        let clientX = e.clientX;
-        let clientY = e.clientY;
-
-        if (e.touches && e.touches.length > 0) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-            e.preventDefault();
-        }
+        // Pointer event already contains clientX/clientY correctly for both mouse and touch!
+        const clientX = e.clientX;
+        const clientY = e.clientY;
 
         const rect = this.canvas.getBoundingClientRect();
         this.mousePos.x = clientX - rect.left;
@@ -425,12 +502,19 @@ class GameEngine {
 
     handlePointerDown(e) {
         if (this.state !== GAME_STATE.PLAYING) return;
+        // Don't register canvas clicks down if we touched a UI button
+        if (e.target !== this.canvas) return;
+
+        this.isDragging = true;
+        this.canvas.setPointerCapture(e.pointerId); // Lock pointer to canvas during drag
         this.handlePointerMove(e);
         // Removed shoot() from here so player can aim by holding down
     }
 
     handlePointerUp(e) {
         if (this.state !== GAME_STATE.PLAYING) return;
+        this.isDragging = false;
+        this.canvas.releasePointerCapture(e.pointerId);
         this.shoot();
     }
 
@@ -495,6 +579,23 @@ class GameEngine {
     update(dt) {
         if (this.state === GAME_STATE.START) return;
 
+        // Drop ceiling slowly
+        if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.ANIMATING) {
+            this.currentCeilingOffset += 6 * (dt / 1000); // 6 pixels per second
+            this.topMargin = this.baseTopMargin + this.currentCeilingOffset;
+            this.recalculateGridPositions();
+
+            // Check if any active grid bubbles touch the gun (GAME OVER)
+            for (let b of this.bubbles) {
+                if (b.active && !b.popping && !b.falling) {
+                    if (b.y + b.radius * 0.8 >= this.playerCannon.y) {
+                        this.handleGameOver();
+                        return;
+                    }
+                }
+            }
+        }
+
         // Update active bubbles that are popping or falling
         for (let i = this.bubbles.length - 1; i >= 0; i--) {
             const b = this.bubbles[i];
@@ -518,6 +619,14 @@ class GameEngine {
             this.particles[i].update(dt);
             if (this.particles[i].life <= 0) {
                 this.particles.splice(i, 1);
+            }
+        }
+
+        // Update Floating Texts
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            this.floatingTexts[i].update(dt);
+            if (this.floatingTexts[i].life <= 0) {
+                this.floatingTexts.splice(i, 1);
             }
         }
 
@@ -560,7 +669,7 @@ class GameEngine {
             }
 
             // Ceiling collision
-            if (this.activeBubble.y - this.bubbleRadius <= 0) {
+            if (this.activeBubble.y - this.bubbleRadius <= this.topMargin) {
                 this.snapBubble();
                 return;
             }
@@ -580,6 +689,25 @@ class GameEngine {
             if (hasCollided) {
                 this.snapBubble();
             }
+        }
+    }
+
+    playBurstSounds(count, color) {
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => {
+                this.audio.playPop(color, 1 + (i * 0.05)); // pitch goes up each bubble softly
+            }, i * 100); // 100ms delay between each soft pop sound
+        }
+
+        if (count >= 5 && window.speechSynthesis) { // Combo announcer
+            setTimeout(() => {
+                const phrases = ["Nice play!", "Impressive!", "Awesome!", "Well scored!", "You are playing very well!"];
+                const text = phrases[Math.floor(Math.random() * phrases.length)];
+                let u = new SpeechSynthesisUtterance(text);
+                u.rate = 1.1;
+                u.pitch = 1.2;
+                window.speechSynthesis.speak(u);
+            }, 300);
         }
     }
 
@@ -625,18 +753,40 @@ class GameEngine {
         this.activeBubble = null;
 
         // Check Matches
-        const matchGroup = this.findMatches(row, col, savedColor);
+        let matchGroup = [];
+        if (savedColor === 'bomb') {
+            // Explode bomb plus surrounding bubbles
+            matchGroup = [this.grid[row][col]];
+            const neighbors = this.getNeighbors(row, col);
+            for (let n of neighbors) {
+                let b = this.grid[n.r][n.c];
+                if (b && !b.popping && !b.falling) {
+                    if (!matchGroup.includes(b)) matchGroup.push(b);
+                }
+            }
+        } else {
+            matchGroup = this.findMatches(row, col, savedColor);
+        }
 
-        if (matchGroup.length >= 3) {
-            this.audio.playPop();
-            this.updateScore(matchGroup.length * 10);
+        if (matchGroup.length >= 3 || (savedColor === 'bomb' && matchGroup.length > 0)) {
+            let popScore = matchGroup.length * 10;
+            this.playBurstSounds(matchGroup.length, savedColor);
 
             // Pop matched cluster
             for (let b of matchGroup) {
                 b.popping = true;
                 this.grid[b.row][b.col] = null;
-                this.createParticles(b.x, b.y, b.color, 8);
+                this.createParticles(b.x, b.y, b.color === 'bomb' ? '#ef4444' : b.color, 8);
             }
+
+            // Draw floating text
+            let centerB = this.grid[row] && this.grid[row][col] ? this.grid[row][col] : matchGroup[0];
+            if (centerB) {
+                this.floatingTexts.push(new FloatingText(centerB.x, centerB.y, `+${popScore}`, '#fde047'));
+            }
+
+            // Add score AFTER a short delay 
+            setTimeout(() => this.updateScore(popScore), 600);
 
             // Find Disconnected
             const disconnected = this.findFloatingBubbles();
@@ -649,19 +799,9 @@ class GameEngine {
         }
 
         // Wait for animations, but if no matches load next bubble instantly
-        if (matchGroup.length < 3) {
+        if (matchGroup.length < 3 && savedColor !== 'bomb') {
             this.state = GAME_STATE.PLAYING;
             this.checkWinCondition();
-        }
-
-        // Check game over
-        if (this.state !== GAME_STATE.GAME_OVER) {
-            for (let c = 0; c < this.cols; c++) {
-                if (this.grid[this.maxRows - 1] && this.grid[this.maxRows - 1][c] != null) {
-                    this.handleGameOver();
-                    return;
-                }
-            }
         }
     }
 
@@ -806,40 +946,56 @@ class GameEngine {
     // --- Drawing ---
 
     drawAimLine() {
+        if (!this.isDragging) return;
         if (!this.activeBubble || this.state !== GAME_STATE.PLAYING ||
             this.activeBubble.vx !== 0 || this.activeBubble.vy !== 0) return;
 
         this.ctx.save();
         this.ctx.setLineDash([10, 15]);
         this.ctx.lineWidth = 4;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+
+        if (this.activeBubble.color === 'bomb') {
+            this.ctx.strokeStyle = '#ef4444'; // Red for bomb
+        } else {
+            this.ctx.strokeStyle = this.activeBubble.color;
+        }
+        this.ctx.globalAlpha = 0.6;
+
         this.ctx.beginPath();
 
         let startX = this.playerCannon.x;
         let startY = this.playerCannon.y;
         this.ctx.moveTo(startX, startY);
 
-        // Use a much larger multiplier so the line reaches the top of very tall screens
-        const lineLength = Math.max(this.canvas.width, this.canvas.height) * 4;
-        const targetX = startX + Math.cos(this.playerCannon.angle) * lineLength;
-        const targetY = startY + Math.sin(this.playerCannon.angle) * lineLength;
+        let cx = startX;
+        let cy = startY;
+        let vx = Math.cos(this.playerCannon.angle);
+        let vy = Math.sin(this.playerCannon.angle);
 
-        if (targetX < 0) {
-            // Hit left wall
-            let t = -startX / (targetX - startX);
-            let hitY = startY + t * (targetY - startY);
-            this.ctx.lineTo(0, hitY);
-            // Reflect off the left wall (mirror X coordinates)
-            this.ctx.lineTo(-targetX, targetY);
-        } else if (targetX > this.canvas.width) {
-            // Hit right wall
-            let t = (this.canvas.width - startX) / (targetX - startX);
-            let hitY = startY + t * (targetY - startY);
-            this.ctx.lineTo(this.canvas.width, hitY);
-            // Reflect off the right wall (mirror X coordinates)
-            this.ctx.lineTo(2 * this.canvas.width - targetX, targetY);
-        } else {
-            this.ctx.lineTo(targetX, targetY);
+        // Max bounces to prevent infinite loop (just in case), user wants 1 fold reflect so limit is 2 ray segments.
+        let bounces = 0;
+
+        while (cy > this.topMargin && bounces < 2) {
+            let tSide = Infinity;
+            if (vx < 0) tSide = (0 - cx) / vx;
+            else if (vx > 0) tSide = (this.canvas.width - cx) / vx;
+
+            let tTop = (this.topMargin - cy) / Math.min(-0.001, vy); // vy is mostly negative
+
+            let t = Math.min(tSide, tTop);
+
+            cx += vx * t;
+            cy += vy * t;
+            this.ctx.lineTo(cx, cy);
+
+            if (tTop <= tSide) {
+                // Hit ceiling, stop drawing!
+                break;
+            } else {
+                // Hit side wall, reflect X velocity instantly and continue
+                vx *= -1;
+                bounces++;
+            }
         }
 
         this.ctx.stroke();
@@ -851,6 +1007,26 @@ class GameEngine {
 
         if (this.state === GAME_STATE.PLAYING) {
             this.drawAimLine();
+        }
+
+        // Draw descending ceiling wall (Visible warning boundary)
+        if (this.topMargin > 0) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(239, 68, 68, 0.05)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.topMargin);
+
+            this.ctx.strokeStyle = '#ef4444'; // Red energy line
+            this.ctx.lineWidth = 3;
+            // Pulsing glow effect based on time
+            let glow = 10 + Math.sin(Date.now() / 200) * 5;
+            this.ctx.shadowBlur = glow;
+            this.ctx.shadowColor = '#ef4444';
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, this.topMargin);
+            this.ctx.lineTo(this.canvas.width, this.topMargin);
+            this.ctx.stroke();
+            this.ctx.restore();
         }
 
         // Draw grid bubbles
@@ -873,22 +1049,57 @@ class GameEngine {
             p.draw(this.ctx);
         }
 
-        // Draw player cannon
-        this.ctx.fillStyle = 'var(--panel-bg)';
+        // Draw Floating Texts
+        for (let t of this.floatingTexts) {
+            t.draw(this.ctx);
+        }
+
+        // Draw player cannon (Golden Shield Base)
+        this.ctx.save();
+        const gradient = this.ctx.createRadialGradient(
+            this.playerCannon.x, this.playerCannon.y, this.bubbleRadius * 0.5,
+            this.playerCannon.x, this.playerCannon.y, this.bubbleRadius * 2.5
+        );
+        gradient.addColorStop(0, '#fef08a'); // Bright gold
+        gradient.addColorStop(0.6, '#eab308'); // Pure gold
+        gradient.addColorStop(1, '#854d0e'); // Dark antique gold
+
+        this.ctx.fillStyle = gradient;
         this.ctx.beginPath();
-        this.ctx.arc(this.playerCannon.x, this.playerCannon.y, this.bubbleRadius * 2, Math.PI, 0);
+        this.ctx.arc(this.playerCannon.x, this.playerCannon.y, this.bubbleRadius * 2.5, Math.PI, 0);
         this.ctx.fill();
+
+        // Shield Metallic Rim
+        this.ctx.strokeStyle = '#fde047';
+        this.ctx.lineWidth = 3;
+        this.ctx.stroke();
+        this.ctx.restore();
 
         // Draw cannon barrel
         this.ctx.save();
         this.ctx.translate(this.playerCannon.x, this.playerCannon.y);
         this.ctx.rotate(this.playerCannon.angle);
-        this.ctx.fillStyle = 'var(--accent)';
-        this.ctx.shadowColor = 'var(--accent-glow)';
-        this.ctx.shadowBlur = 10;
+
+        // Golden barrel
+        const barrelGrad = this.ctx.createLinearGradient(0, -this.bubbleRadius, 0, this.bubbleRadius);
+        barrelGrad.addColorStop(0, '#d97706');
+        barrelGrad.addColorStop(0.5, '#fde047');
+        barrelGrad.addColorStop(1, '#d97706');
+        this.ctx.fillStyle = barrelGrad;
+
+        this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        this.ctx.shadowBlur = 6;
+        this.ctx.shadowOffsetY = 4;
+
         this.ctx.beginPath();
-        this.ctx.roundRect(0, -this.bubbleRadius * 0.4, this.bubbleRadius * 3, this.bubbleRadius * 0.8, 8);
+        // Snout
+        this.ctx.roundRect(0, -this.bubbleRadius * 0.7, this.bubbleRadius * 3.5, this.bubbleRadius * 1.4, 6);
         this.ctx.fill();
+
+        // Barrel Rim
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = '#ca8a04';
+        this.ctx.stroke();
         this.ctx.restore();
 
         // Draw active bubble ON TOP so it is visible in the gun

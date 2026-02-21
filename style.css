@@ -41,7 +41,7 @@ body {
     max-width: 600px;
     /* Constrain on desktop for better gameplay */
     height: 100%;
-    background: radial-gradient(circle at 50% 100%, #1e293b, var(--bg-color));
+    background: url('gameplay_bg.png') center/cover no-repeat;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
     overflow: hidden;
 }
@@ -134,6 +134,40 @@ canvas {
     transition: background-color 0.2s;
 }
 
+#restart-game-ui {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10;
+}
+
+.glass-btn {
+    background: var(--panel-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.glass-btn:hover {
+    transform: scale(1.1);
+    background: rgba(59, 130, 246, 0.3);
+    border-color: var(--accent);
+}
+
+.glass-btn:active {
+    transform: scale(0.9);
+}
+
 /* Modals */
 #overlay,
 #start-screen {
@@ -153,8 +187,7 @@ canvas {
 }
 
 .hidden {
-    opacity: 0;
-    pointer-events: none;
+    display: none !important;
 }
 
 .modal {
@@ -248,4 +281,122 @@ canvas {
 .glow-btn:active {
     transform: translateY(2px) scale(0.95);
     box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+/* Map Screen UI */
+#map-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('map_bg.png') center/cover no-repeat;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+}
+
+#map-screen.hidden {
+    display: none !important;
+}
+
+#map-tabs {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    padding: 20px 10px 10px;
+    flex-shrink: 0;
+}
+
+.map-tab {
+    background: transparent;
+    color: white;
+    border: none;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+}
+
+.map-tab.active {
+    border-bottom: 3px solid var(--accent);
+    color: var(--accent);
+}
+
+.map-tab:disabled {
+    color: gray;
+    cursor: not-allowed;
+}
+
+.map-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    scrollbar-width: none;
+    /* Hide scrollbar Firefox */
+}
+
+.map-scroll-container::-webkit-scrollbar {
+    display: none;
+}
+
+#map-path {
+    position: relative;
+    width: 100%;
+    height: 3000px;
+    /* Big height to fit 30 winding nodes */
+}
+
+.level-node {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 4px solid #fff;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s;
+}
+
+.level-node:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.level-node.locked {
+    background: #333;
+    border-color: #555;
+    color: #888;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.level-node.active-level {
+    border-color: var(--color-yellow);
+    box-shadow: 0 0 20px var(--color-yellow);
+    animation: pulseMap 2s infinite;
+}
+
+@keyframes pulseMap {
+    0% {
+        box-shadow: 0 0 10px var(--color-yellow);
+    }
+
+    50% {
+        box-shadow: 0 0 30px var(--color-yellow);
+    }
+
+    100% {
+        box-shadow: 0 0 10px var(--color-yellow);
+    }
 }

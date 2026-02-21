@@ -35,6 +35,18 @@
             <div id="next-ball-preview"></div>
         </div>
 
+        <!-- In-Game Restart Button -->
+        <div id="restart-game-ui">
+            <button id="in-game-restart-btn" class="glass-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-rotate-ccw-icon lucide-rotate-ccw">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+            </button>
+        </div>
+
         <!-- Game Over / Victory Overlay -->
         <div id="overlay" class="hidden">
             <div class="modal">
@@ -52,8 +64,32 @@
             <div class="modal">
                 <h1 class="title-gradient">BUBBLE ARCADE</h1>
                 <p>Match 3 or more bubbles to blast them.<br>Clear the board to win!</p>
-                <button id="start-btn" class="glow-btn">START GAME</button>
+                <button id="start-btn" class="glow-btn">PLAY</button>
             </div>
+        </div>
+
+        <!-- Level Map Screen -->
+        <div id="map-screen" class="hidden">
+            <div id="map-tabs">
+                <button class="map-tab active">Map 1</button>
+                <button class="map-tab" disabled title="Coming Soon">Map 2 (Locked)</button>
+                <button class="map-tab" disabled title="Coming Soon">Map 3 (Locked)</button>
+                <button class="map-tab" disabled title="Coming Soon">Map 4 (Locked)</button>
+                <button class="map-tab" disabled title="Coming Soon">Map 5 (Locked)</button>
+            </div>
+
+            <div class="map-scroll-container">
+                <div id="map-path">
+                    <!-- JS will inject level nodes here -->
+                </div>
+            </div>
+
+            <button id="back-to-menu-btn" class="glass-btn" style="position: absolute; bottom: 20px; left: 20px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m15 18-6-6 6-6" />
+                </svg>
+            </button>
         </div>
     </div>
 
