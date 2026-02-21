@@ -4,96 +4,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bubble Arcade Classic</title>
-    <meta name="description"
-        content="A modern, fully-featured bubble shooter web game with levels, scoring, and animations.">
-    <!-- Google Fonts -->
+    <title>Ashu Bubble Adventure</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <div id="game-container">
-        <!-- Main Game Canvas -->
-        <canvas id="gameCanvas"></canvas>
-
-        <!-- Top UI Bar -->
-        <div id="top-ui">
-            <div class="ui-panel score-panel">
-                <span class="label">SCORE</span>
-                <span id="score" class="value">0</span>
-            </div>
-            <div class="ui-panel level-panel">
-                <span class="label">LEVEL</span>
-                <span id="level" class="value">1</span>
-            </div>
-        </div>
-
-        <!-- Next Ball Preview UI -->
-        <div id="next-ball-ui">
-            <span class="label">NEXT</span>
-            <div id="next-ball-preview"></div>
-        </div>
-
-        <!-- In-Game Restart Button -->
-        <div id="restart-game-ui">
-            <button id="in-game-restart-btn" class="glass-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    class="lucide lucide-rotate-ccw-icon lucide-rotate-ccw">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                </svg>
-            </button>
-        </div>
-
-        <!-- Game Over / Victory Overlay -->
-        <div id="overlay" class="hidden">
-            <div class="modal">
-                <h1 id="overlay-title">GAME OVER</h1>
-                <p id="overlay-message">The bubbles reached the bottom!</p>
-                <div class="stats">
-                    <p>Final Score: <span id="final-score">0</span></p>
-                </div>
-                <button id="restart-btn" class="glow-btn">PLAY AGAIN</button>
-            </div>
-        </div>
-
         <!-- Start Screen -->
-        <div id="start-screen">
-            <div class="modal">
-                <h1 class="title-gradient">BUBBLE ARCADE</h1>
-                <p>Match 3 or more bubbles to blast them.<br>Clear the board to win!</p>
-                <button id="start-btn" class="glow-btn">PLAY</button>
+        <div id="start-screen" class="screen">
+            <div class="logo-area">
+                <div class="logo-bubble pulsate">
+                    <span class="logo-text">ASHU<br>BUBBLE</span>
+                </div>
+            </div>
+            <div class="menu-btns">
+                <button id="start-game-btn" class="main-btn">START</button>
+                <button id="settings-btn" class="icon-btn-circle">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                </button>
             </div>
         </div>
 
         <!-- Level Map Screen -->
-        <div id="map-screen" class="hidden">
-            <div id="map-tabs">
-                <button class="map-tab active">Map 1</button>
-                <button class="map-tab" disabled title="Coming Soon">Map 2 (Locked)</button>
-                <button class="map-tab" disabled title="Coming Soon">Map 3 (Locked)</button>
-                <button class="map-tab" disabled title="Coming Soon">Map 4 (Locked)</button>
-                <button class="map-tab" disabled title="Coming Soon">Map 5 (Locked)</button>
+        <div id="map-screen" class="screen hidden">
+            <div id="map-header">
+                <h2>MAP ADVENTURE</h2>
+                <div class="stars-total"><span class="star-mini">★</span> <span id="total-stars-val">0/90</span></div>
             </div>
+            <div class="map-scroll">
+                <div id="level-nodes-container"></div>
+            </div>
+            <button id="map-back-btn" class="back-btn">BACK</button>
+        </div>
 
-            <div class="map-scroll-container">
-                <div id="map-path">
-                    <!-- JS will inject level nodes here -->
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen hidden">
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Top HUD -->
+            <div id="game-top-hud">
+                <div class="hud-item">
+                    <span class="hud-label">SCORE</span>
+                    <span id="score-val" class="hud-value">0</span>
+                </div>
+                <div id="hud-center">
+                    <button id="pause-btn" class="hud-icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor">
+                            <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
+                        </svg></button>
+                    <button id="home-btn" class="hud-icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                        </svg></button>
+                    <button id="music-btn" class="hud-icon-btn"><svg id="music-on-svg" viewBox="0 0 24 24" width="24"
+                            height="24" fill="currentColor">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg></button>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">LEVEL</span>
+                    <span id="level-val" class="hud-value">1</span>
                 </div>
             </div>
 
-            <button id="back-to-menu-btn" class="glass-btn" style="position: absolute; bottom: 20px; left: 20px;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m15 18-6-6 6-6" />
-                </svg>
-            </button>
+            <!-- Bottom HUD -->
+            <div id="game-bottom-hud">
+                <div id="next-preview">
+                    <span class="next-label">NEXT</span>
+                    <div id="next-ball-circle"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Popups & Overlays -->
+        <div id="pause-overlay" class="overlay hidden">
+            <div class="popup">
+                <button id="resume-btn" class="popup-btn">RESUME</button>
+                <button id="restart-btn" class="popup-btn">RESTART</button>
+                <button id="popup-home-btn" class="popup-btn">HOME</button>
+                <button id="popup-music-btn" class="popup-btn">MUSIC ON</button>
+                <button id="close-x" class="close-x">×</button>
+            </div>
+        </div>
+
+        <div id="win-overlay" class="overlay hidden">
+            <div class="popup win-popup">
+                <div class="stars-display">
+                    <span class="star-win" id="star1">★</span>
+                    <span class="star-win" id="star2">★</span>
+                    <span class="star-win" id="star3">★</span>
+                </div>
+                <h2>LEVEL COMPLETE!</h2>
+                <div class="popup-score">SCORE: <span id="win-score-val">0</span></div>
+                <div class="popup-btn-row">
+                    <button id="win-next-btn" class="popup-btn">NEXT</button>
+                    <button id="win-map-btn" class="popup-btn">MAP</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="lose-overlay" class="overlay hidden">
+            <div class="popup lose-popup">
+                <div class="lose-icon">☹</div>
+                <h2>GAME OVER</h2>
+                <div class="popup-btn-row">
+                    <button id="retry-btn" class="popup-btn">RETRY</button>
+                    <button id="lose-home-btn" class="popup-btn">HOME</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Game Logic -->
+    <!-- Notification system for "Complete previous level" -->
+    <div id="toast" class="hidden">Complete previous level</div>
+
     <script src="script.js"></script>
 </body>
 
