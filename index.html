@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bubble Arcade Classic</title>
+    <meta name="description"
+        content="A modern, fully-featured bubble shooter web game with levels, scoring, and animations.">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- Main Game Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Top UI Bar -->
+        <div id="top-ui">
+            <div class="ui-panel score-panel">
+                <span class="label">SCORE</span>
+                <span id="score" class="value">0</span>
+            </div>
+            <div class="ui-panel level-panel">
+                <span class="label">LEVEL</span>
+                <span id="level" class="value">1</span>
+            </div>
+        </div>
+
+        <!-- Next Ball Preview UI -->
+        <div id="next-ball-ui">
+            <span class="label">NEXT</span>
+            <div id="next-ball-preview"></div>
+        </div>
+
+        <!-- Game Over / Victory Overlay -->
+        <div id="overlay" class="hidden">
+            <div class="modal">
+                <h1 id="overlay-title">GAME OVER</h1>
+                <p id="overlay-message">The bubbles reached the bottom!</p>
+                <div class="stats">
+                    <p>Final Score: <span id="final-score">0</span></p>
+                </div>
+                <button id="restart-btn" class="glow-btn">PLAY AGAIN</button>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen">
+            <div class="modal">
+                <h1 class="title-gradient">BUBBLE ARCADE</h1>
+                <p>Match 3 or more bubbles to blast them.<br>Clear the board to win!</p>
+                <button id="start-btn" class="glow-btn">START GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Logic -->
+    <script src="script.js"></script>
+</body>
+
+</html>
