@@ -242,12 +242,16 @@ class GameEngine {
         this.loop = this.loop.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerDown = this.handlePointerDown.bind(this);
+        this.handlePointerUp = this.handlePointerUp.bind(this); // new up handler
 
         window.addEventListener('resize', this.resize);
         this.canvas.addEventListener('mousemove', this.handlePointerMove);
         this.canvas.addEventListener('mousedown', this.handlePointerDown);
+        this.canvas.addEventListener('mouseup', this.handlePointerUp); // bind up to shoot
+
         this.canvas.addEventListener('touchmove', this.handlePointerMove, { passive: false });
         this.canvas.addEventListener('touchstart', this.handlePointerDown, { passive: false });
+        this.canvas.addEventListener('touchend', this.handlePointerUp, { passive: false }); // bind up to shoot
 
         this.lastTime = 0;
         this.resize();
@@ -422,6 +426,11 @@ class GameEngine {
     handlePointerDown(e) {
         if (this.state !== GAME_STATE.PLAYING) return;
         this.handlePointerMove(e);
+        // Removed shoot() from here so player can aim by holding down
+    }
+
+    handlePointerUp(e) {
+        if (this.state !== GAME_STATE.PLAYING) return;
         this.shoot();
     }
 

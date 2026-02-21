@@ -75,6 +75,22 @@ canvas {
     flex-direction: column;
     align-items: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    min-width: 80px;
+    /* Ensure uniform size */
+}
+
+@media (max-width: 480px) {
+    .ui-panel {
+        padding: 5px 10px;
+        min-width: 60px;
+        border-radius: 12px;
+    }
+
+    #top-ui {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+    }
 }
 
 .label {
@@ -178,6 +194,7 @@ canvas {
 .title-gradient {
     background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
