@@ -51,14 +51,22 @@ class AudioEngine {
         });
     }
     playLose() { this._playTone(150, 0.5, 'sawtooth', 0.1); }
-    playClick() { this._playTone(800, 0.05); }
+
+    playClick() {
+        this._playTone(1200, 0.08, 'sine', 0.15);
+    }
 
     startMusic() {
         if (!this.musicEnabled) return;
-        // Basic rhythmic pulse for background music
+        this.stopMusic();
+
         this.musicInterval = setInterval(() => {
             if (!this.musicEnabled) return;
-            this._playTone(130.81, 0.8, 'triangle', 0.05);
+            this._playTone(60, 0.15, 'sine', 0.3);
+            setTimeout(() => {
+                if (!this.musicEnabled) return;
+                this._playTone(800, 0.05, 'triangle', 0.05);
+            }, 500);
         }, 1000);
     }
     stopMusic() { clearInterval(this.musicInterval); }
@@ -88,21 +96,33 @@ class Bubble {
 
         const grad = ctx.createRadialGradient(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.1, 0, 0, this.radius);
         grad.addColorStop(0, '#fff');
-        grad.addColorStop(0.4, this.color);
-        grad.addColorStop(1, '#000');
+        grad.addColorStop(0.3, this.color);
+        grad.addColorStop(1, this.calculateDarkerColor(this.color));
 
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Highlight shine
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        const shineGrad = ctx.createLinearGradient(0, -this.radius, 0, 0);
+        shineGrad.addColorStop(0, 'rgba(255,255,255,0.8)');
+        shineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+
+        ctx.fillStyle = shineGrad;
         ctx.beginPath();
-        ctx.arc(-this.radius * 0.35, -this.radius * 0.35, this.radius * 0.2, 0, Math.PI * 2);
+        ctx.ellipse(0, -this.radius * 0.4, this.radius * 0.7, this.radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(0, this.radius * 0.6, this.radius * 0.5, this.radius * 0.2, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
+    }
+
+    calculateDarkerColor(hex) {
+        return hex + 'cc';
     }
 }
 
@@ -115,19 +135,18 @@ class GameEngine {
         this.state = GAME_STATE.START;
         this.score = 0;
         this.currentLevel = 0;
-        this.movesRemaining = 25;
         this.unlockedLevel = parseInt(localStorage.getItem('ashu_unlocked')) || 0;
 
         this.bubbles = [];
-        this.floatingBubbles = [];
         this.activeBubble = null;
         this.nextBubbleColor = null;
         this.isDragging = false;
+        this.targetAngle = -Math.PI / 2;
 
         this.cols = 11;
         this.bubbleRadius = 0;
         this.rowHeight = 0;
-        this.topMargin = 100;
+        this.topMargin = 50;
         this.shotsTaken = 0;
         this.grid = [];
         this.dangerLineY = 0;
@@ -140,38 +159,41 @@ class GameEngine {
     initListeners() {
         window.addEventListener('resize', () => this.resize());
 
-        // Screens & Buttons
-        document.getElementById('start-game-btn').onclick = () => { this.audio.playWin(); this.showMap(); this.audio.startMusic(); };
-        document.getElementById('settings-btn').onclick = () => this.audio.playClick();
-        document.getElementById('map-back-btn').onclick = () => this.showStart();
-        document.getElementById('pause-btn').onclick = () => this.pauseGame();
-        document.getElementById('home-btn').onclick = () => this.showStart();
-        document.getElementById('music-btn').onclick = () => this.toggleMusic();
+        document.getElementById('start-game-btn').onclick = () => { this.audio.playClick(); this.showMap(); this.audio.startMusic(); };
+        document.getElementById('settings-btn').onclick = () => { this.audio.playClick(); this.pauseGame(); };
+        document.getElementById('map-back-btn').onclick = () => { this.audio.playClick(); this.showStart(); };
+        document.getElementById('in-game-pause-btn').onclick = () => { this.audio.playClick(); this.pauseGame(); };
+        document.getElementById('exchange-btn').onclick = () => { this.audio.playClick(); this.exchangeBall(); };
+        document.getElementById('close-x').onclick = () => { this.audio.playClick(); this.resumeGame(); };
 
-        document.getElementById('resume-btn').onclick = () => this.resumeGame();
-        document.getElementById('restart-btn').onclick = () => this.loadLevel(this.currentLevel);
-        document.getElementById('popup-home-btn').onclick = () => this.showStart();
-        document.getElementById('popup-music-btn').onclick = () => this.toggleMusic();
-        document.getElementById('close-x').onclick = () => this.resumeGame();
+        document.getElementById('win-next-btn').onclick = () => { this.audio.playClick(); this.currentLevel++; this.loadLevel(this.currentLevel); };
+        document.getElementById('win-map-btn').onclick = () => { this.audio.playClick(); this.showMap(); };
+        document.getElementById('win-retry-btn').onclick = () => { this.audio.playClick(); this.loadLevel(this.currentLevel); };
+        document.getElementById('retry-btn').onclick = () => { this.audio.playClick(); this.loadLevel(this.currentLevel); };
+        document.getElementById('lose-home-btn').onclick = () => { this.audio.playClick(); this.showStart(); };
 
-        document.getElementById('win-next-btn').onclick = () => { this.currentLevel++; this.loadLevel(this.currentLevel); };
-        document.getElementById('win-map-btn').onclick = () => this.showMap();
-        document.getElementById('retry-btn').onclick = () => this.loadLevel(this.currentLevel);
-        document.getElementById('lose-home-btn').onclick = () => this.showStart();
+        document.getElementById('how-to-play-btn').onclick = () => this.audio.playClick();
+        document.getElementById('popup-music-btn').onclick = () => { this.audio.playClick(); this.toggleMusic(); };
+        document.getElementById('language-btn').onclick = () => this.audio.playClick();
 
-        // Interaction
-        const handleStart = (e) => {
-            if (this.state !== GAME_STATE.PLAYING) return;
-            this.isDragging = true;
-            this.handleMove(e);
-        };
         const handleMove = (e) => {
-            if (!this.isDragging || this.state !== GAME_STATE.PLAYING) return;
+            if (this.state !== GAME_STATE.PLAYING) return;
             const pos = this.getEventPos(e);
             this.targetAngle = Math.atan2(pos.y - this.cannonPos.y, pos.x - this.cannonPos.x);
         };
-        const handleEnd = () => {
-            if (this.isDragging) {
+
+        const handleStart = (e) => {
+            if (this.state !== GAME_STATE.PLAYING) return;
+            if (e.type === 'touchstart') {
+                this.isDragging = true;
+                handleMove(e);
+            } else if (e.type === 'mousedown') {
+                this.shoot();
+            }
+        };
+
+        const handleEnd = (e) => {
+            if (e.type === 'touchend' && this.isDragging) {
                 this.isDragging = false;
                 this.shoot();
             }
@@ -179,16 +201,15 @@ class GameEngine {
 
         this.canvas.addEventListener('mousedown', handleStart);
         window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-        this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); });
-        window.addEventListener('touchmove', handleMove);
-        window.addEventListener('touchend', handleEnd);
+        this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, { passive: false });
+        window.addEventListener('touchmove', (e) => { handleMove(e); }, { passive: false });
+        window.addEventListener('touchend', (e) => { handleEnd(e); }, { passive: false });
     }
 
     getEventPos(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
         return { x: clientX - rect.left, y: clientY - rect.top };
     }
 
@@ -198,8 +219,7 @@ class GameEngine {
         this.canvas.height = container.clientHeight;
         this.bubbleRadius = this.canvas.width / (this.cols * 2);
         this.rowHeight = this.bubbleRadius * 1.73;
-        this.cannonPos = { x: this.canvas.width / 2, y: this.canvas.height - 130 };
-        this.cannonPos = { x: this.canvas.width / 2, y: this.canvas.height - 130 };
+        this.cannonPos = { x: this.canvas.width / 2, y: this.canvas.height - 100 };
         this.dangerLineY = this.cannonPos.y - this.bubbleRadius * 2;
         if (this.activeBubble) {
             this.activeBubble.x = this.cannonPos.x;
@@ -226,29 +246,43 @@ class GameEngine {
     }
 
     renderMap() {
-        const container = document.getElementById('level-nodes-container');
-        container.innerHTML = '';
-        for (let i = 0; i < 30; i++) {
-            const node = document.createElement('div');
-            node.className = `level-node ${i <= this.unlockedLevel ? 'unlocked' : 'locked'} ${i === this.unlockedLevel ? 'current' : ''}`;
-            const row = Math.floor(i / 3);
-            const col = i % 3;
-            node.style.bottom = `${100 + i * 110}px`;
-            node.style.left = `${20 + (i % 2 === 0 ? 20 : 60)}%`;
-            node.innerText = i + 1;
+        const grid = document.getElementById('level-grid');
+        grid.innerHTML = '';
+        const pageSize = 20;
+        const startIdx = (this.currentPage || 0) * pageSize;
+        const endIdx = startIdx + pageSize;
 
-            node.onclick = () => {
-                if (i <= this.unlockedLevel) {
+        for (let i = startIdx; i < endIdx && i < 100; i++) {
+            const item = document.createElement('div');
+            const isUnlocked = i <= this.unlockedLevel;
+            item.className = `level-item ${isUnlocked ? 'unlocked' : 'locked'}`;
+            item.innerText = i + 1;
+
+            if (isUnlocked) {
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    this.audio.playClick();
                     this.currentLevel = i;
                     this.loadLevel(i);
-                } else {
+                };
+            } else {
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    this.audio.playClick();
                     const toast = document.getElementById('toast');
+                    toast.innerText = "Level Locked!";
                     toast.classList.remove('hidden');
                     setTimeout(() => toast.classList.add('hidden'), 2000);
-                }
-            };
-            container.appendChild(node);
+                };
+            }
+            grid.appendChild(item);
         }
+
+        const dots = document.querySelectorAll('.dot');
+        dots.forEach((dot, idx) => {
+            dot.className = `dot ${idx === (this.currentPage || 0) ? 'active' : ''}`;
+            dot.onclick = () => { this.currentPage = idx; this.renderMap(); };
+        });
     }
 
     loadLevel(idx) {
@@ -259,7 +293,6 @@ class GameEngine {
         this.switchScreen('game-screen');
         this.state = GAME_STATE.PLAYING;
 
-        // Create initial grid
         this.grid = [];
         this.bubbles = [];
         for (let r = 0; r < 8; r++) {
@@ -280,7 +313,18 @@ class GameEngine {
     loadActive() {
         this.activeBubble = new Bubble(this.cannonPos.x, this.cannonPos.y, this.bubbleRadius, this.nextBubbleColor);
         this.nextBubbleColor = BUBBLE_COLORS[Math.floor(Math.random() * 6)];
-        document.getElementById('next-ball-circle').style.backgroundColor = this.nextBubbleColor;
+        const nextBallEl = document.getElementById('footer-next-ball');
+        if (nextBallEl) nextBallEl.style.backgroundColor = this.nextBubbleColor;
+    }
+
+    exchangeBall() {
+        if (!this.activeBubble || this.activeBubble.vx !== 0) return;
+        this.audio.playClick();
+        const temp = this.activeBubble.color;
+        this.activeBubble.color = this.nextBubbleColor;
+        this.nextBubbleColor = temp;
+        const nextBallEl = document.getElementById('footer-next-ball');
+        if (nextBallEl) nextBallEl.style.backgroundColor = this.nextBubbleColor;
     }
 
     getGridCoords(r, c) {
@@ -301,8 +345,10 @@ class GameEngine {
     }
 
     updateHUD() {
-        document.getElementById('score-val').innerText = this.score;
-        document.getElementById('level-val').innerText = this.currentLevel + 1;
+        const scoreEl = document.getElementById('score-val');
+        const levelEl = document.getElementById('level-val');
+        if (scoreEl) scoreEl.innerText = this.score;
+        if (levelEl) levelEl.innerText = this.currentLevel + 1;
     }
 
     pauseGame() {
@@ -317,15 +363,8 @@ class GameEngine {
 
     toggleMusic() {
         this.audio.musicEnabled = !this.audio.musicEnabled;
-
-        // Update HUD Icon with cross line
-        const hudBtn = document.getElementById('music-btn');
-        if (hudBtn) hudBtn.classList.toggle('music-off', !this.audio.musicEnabled);
-
-        // Update Popup Btn
-        const popupBtn = document.getElementById('popup-music-btn');
-        if (popupBtn) popupBtn.innerText = `MUSIC ${this.audio.musicEnabled ? 'ON' : 'OFF'}`;
-
+        const popupBtnSpan = document.querySelector('#popup-music-btn span');
+        if (popupBtnSpan) popupBtnSpan.innerText = `Sound ${this.audio.musicEnabled ? 'on' : 'off'}`;
         if (!this.audio.musicEnabled) this.audio.stopMusic(); else this.audio.startMusic();
     }
 
@@ -342,18 +381,15 @@ class GameEngine {
             this.activeBubble.x += this.activeBubble.vx;
             this.activeBubble.y += this.activeBubble.vy;
 
-            // Wall bounce
             if (this.activeBubble.x < this.bubbleRadius || this.activeBubble.x > this.canvas.width - this.bubbleRadius) {
                 this.activeBubble.vx *= -1;
             }
 
-            // Top collision or Bubble collision
             if (this.activeBubble.y < this.topMargin + this.bubbleRadius || this.checkCollision()) {
                 this.snapActive();
             }
         }
 
-        // Update popping bubbles
         for (let i = this.bubbles.length - 1; i >= 0; i--) {
             const b = this.bubbles[i];
             if (b.popping) {
@@ -372,7 +408,6 @@ class GameEngine {
             this.checkGameStatus();
         }
 
-        // Check Danger Line
         for (const b of this.bubbles) {
             if (!b.popping && !b.falling && b.y + b.radius > this.dangerLineY) {
                 this.gameOver();
@@ -391,7 +426,6 @@ class GameEngine {
     }
 
     snapActive() {
-        // Find best grid slot
         let bestSlot = { r: 0, c: 0, dist: Infinity };
         for (let r = 0; r < 20; r++) {
             const rowCount = (r % 2 === 0 ? this.cols : this.cols - 1);
@@ -464,7 +498,6 @@ class GameEngine {
         this.audio.playPop();
         group.forEach(b => {
             b.popping = true;
-            // Clear from grid
             for (let r = 0; r < this.grid.length; r++) {
                 if (!this.grid[r]) continue;
                 const idx = this.grid[r].indexOf(b);
@@ -494,7 +527,6 @@ class GameEngine {
             }
             if (!inGrid) {
                 b.falling = true;
-                // remove from grid
                 for (let r = 0; r < 20; r++) { if (this.grid[r]) { const i = this.grid[r].indexOf(b); if (i !== -1) this.grid[r][i] = null; } }
             }
         });
@@ -508,10 +540,8 @@ class GameEngine {
     }
 
     addNewRow() {
-        // Shift grid down
         for (let r = 19; r > 0; r--) {
             this.grid[r] = this.grid[r - 1] || [];
-            // Update bubble positions
             for (let c = 0; c < this.grid[r].length; c++) {
                 const b = this.grid[r][c];
                 if (b) {
@@ -520,7 +550,6 @@ class GameEngine {
                 }
             }
         }
-        // Add new top row
         this.grid[0] = [];
         for (let c = 0; c < this.cols; c++) {
             const color = BUBBLE_COLORS[Math.floor(Math.random() * 6)];
@@ -544,9 +573,17 @@ class GameEngine {
             this.unlockedLevel++;
             localStorage.setItem('ashu_unlocked', this.unlockedLevel);
         }
-        document.getElementById('star2').classList.add('active');
-        if (this.score > 2000) document.getElementById('star1').classList.add('active');
-        if (this.score > 5000) document.getElementById('star3').classList.add('active');
+
+        const stars = [
+            document.getElementById('star1-win'),
+            document.getElementById('star2-win'),
+            document.getElementById('star3-win')
+        ];
+        stars.forEach(s => s.classList.remove('active'));
+
+        stars[0].classList.add('active');
+        if (this.score > 1500) stars[1].classList.add('active');
+        if (this.score > 3000) stars[2].classList.add('active');
 
         document.getElementById('win-score-val').innerText = this.score;
         document.getElementById('win-overlay').classList.remove('hidden');
@@ -562,21 +599,43 @@ class GameEngine {
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Aim line
-        if (this.isDragging && this.activeBubble) {
+        if (this.activeBubble && (this.isDragging || (this.state === GAME_STATE.PLAYING && !window.matchMedia("(pointer: coarse)").matches))) {
+            this.ctx.save();
             this.ctx.beginPath();
-            this.ctx.setLineDash([5, 10]);
-            this.ctx.moveTo(this.cannonPos.x, this.cannonPos.y);
-            this.ctx.lineTo(this.cannonPos.x + Math.cos(this.targetAngle) * 200, this.cannonPos.y + Math.sin(this.targetAngle) * 200);
-            this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            this.ctx.setLineDash([8, 12]);
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = this.activeBubble.color;
+            this.ctx.globalAlpha = 0.6;
+
+            let curX = this.cannonPos.x;
+            let curY = this.cannonPos.y;
+            let curVX = Math.cos(this.targetAngle);
+            let curVY = Math.sin(this.targetAngle);
+
+            this.ctx.moveTo(curX, curY);
+
+            for (let i = 0; i < 800; i += 5) {
+                curX += curVX * 5;
+                curY += curVY * 5;
+
+                if (curX < this.bubbleRadius || curX > this.canvas.width - this.bubbleRadius) {
+                    curVX *= -1;
+                    this.ctx.lineTo(curX, curY);
+                }
+
+                if (curY < this.topMargin + this.bubbleRadius) break;
+
+                let hitIdx = this.bubbles.findIndex(b => !b.popping && !b.falling && Math.hypot(curX - b.x, curY - b.y) < this.bubbleRadius * 2);
+                if (hitIdx !== -1) break;
+            }
+            this.ctx.lineTo(curX, curY);
             this.ctx.stroke();
-            this.ctx.setLineDash([]);
+            this.ctx.restore();
         }
 
         this.bubbles.forEach(b => b.draw(this.ctx));
-        if (this.activeBubble) this.activeBubble.draw(this.ctx);
 
-        // Danger Line
+        // Draw Danger Line
         this.ctx.save();
         this.ctx.setLineDash([10, 5]);
         this.ctx.strokeStyle = '#ef4444';
@@ -587,36 +646,62 @@ class GameEngine {
         this.ctx.stroke();
         this.ctx.restore();
 
-        // Draw Cannon
+        // Draw Cannon Base / Body first
         this.ctx.save();
         this.ctx.translate(this.cannonPos.x, this.cannonPos.y);
 
-        // Cannon Base
-        const baseGrad = this.ctx.createRadialGradient(0, 0, 10, 0, 0, 40);
-        baseGrad.addColorStop(0, '#1e293b');
-        baseGrad.addColorStop(1, '#0f172a');
-        this.ctx.fillStyle = baseGrad;
+        this.ctx.fillStyle = 'rgba(0,0,0,0.2)';
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, 40, Math.PI, 0);
+        this.ctx.ellipse(0, 45, 40, 10, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
-        this.ctx.rotate(this.targetAngle || -Math.PI / 2);
+        const potGrad = this.ctx.createLinearGradient(-35, 0, 35, 0);
+        potGrad.addColorStop(0, '#1e293b');
+        potGrad.addColorStop(0.5, '#334155');
+        potGrad.addColorStop(1, '#0f172a');
 
-        // Cannon barrel
-        const grad = this.ctx.createLinearGradient(0, -15, 0, 15);
-        grad.addColorStop(0, '#475569');
-        grad.addColorStop(0.5, '#94a3b8');
-        grad.addColorStop(1, '#1e293b');
-
-        this.ctx.fillStyle = grad;
+        this.ctx.fillStyle = potGrad;
+        this.ctx.rotate(this.targetAngle + Math.PI / 2); // Rotate cannon body
         this.ctx.beginPath();
-        this.ctx.roundRect(0, -15, 50, 30, 8);
+        this.ctx.moveTo(-20, -40);
+        this.ctx.quadraticCurveTo(-45, 0, -35, 40);
+        this.ctx.lineTo(35, 40);
+        this.ctx.quadraticCurveTo(45, 0, 20, -40);
+        this.ctx.closePath();
         this.ctx.fill();
-        this.ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = '#fff';
+        this.ctx.lineWidth = 2;
         this.ctx.stroke();
 
+        this.ctx.fillStyle = '#fbbf24';
+        this.ctx.fillRect(-38, 0, 76, 10);
+
+        this.ctx.fillStyle = '#ef4444';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 5, 12, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#fff';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
         this.ctx.restore();
+
+        // Draw Active Bubble LAST (In the nozzle)
+        if (this.activeBubble) {
+            if (this.activeBubble.vx === 0 && this.activeBubble.vy === 0) {
+                // Place in nozzle
+                const nozzleX = this.cannonPos.x + Math.cos(this.targetAngle) * 35;
+                const nozzleY = this.cannonPos.y + Math.sin(this.targetAngle) * 35;
+                const originalX = this.activeBubble.x;
+                const originalY = this.activeBubble.y;
+                this.activeBubble.x = nozzleX;
+                this.activeBubble.y = nozzleY;
+                this.activeBubble.draw(this.ctx);
+                this.activeBubble.x = originalX;
+                this.activeBubble.y = originalY;
+            } else {
+                this.activeBubble.draw(this.ctx);
+            }
+        }
     }
 }
 
